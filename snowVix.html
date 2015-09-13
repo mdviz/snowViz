@@ -50,58 +50,80 @@
 
         return ([rad2degr(lat), rad2degr(lng)]);
     }
+    map = L.map("sourceMap");
+    initialData = 'cleaned/c_1_2014.csv'
+    function make(dataPath) {
+        //Load the Data
+        queue()
+                .defer(d3.csv,dataPath)
+                .await(ready);
+        //Variables
+        var coords = [];
+        var heatData = [];
+        var snow;
+        var first = 0;
+        function ready(error, data) {
+            snow = data;
+
+            snow.forEach(function (d, i) {
+                d.LatLng = new L.LatLng(+d.lat, +d.lng);
+                coords.push([d.LatLng.lat, d.LatLng.lng]);
+                heatData.push([d.LatLng.lat, d.LatLng.lng, d.TotalSnow * d.TotalSnow])
+            });
+
+            var mapCenter = getLatLngCenter(coords);
+            //Leaflet Stuff
+
+            //Set the zoom based on the coordinates
+            map.setView(["40.678620", "-102.797535"], 4);
+            L.tileLayer('https://{s}.tiles.mapbox.com/v3/{id}/{z}/{x}/{y}.png', {
+                maxZoom: 18,
+                minZoom: 2,
+                id: 'mdowd.n6anai1b',
+                access_token: "pk.eyJ1IjoibWRvd2QiLCJhIjoic0xVV3F6cyJ9.-gW3HHcgm-6qeMajHWz5_A"
+            }).addTo(map);
+            L.control.scale().addTo(map);
 
 
-    //Load the Data
-    queue()
-            .defer(d3.csv, 'cleanSnow.csv')
-            .await(ready);
-    //Variables
-    var coords =[];
-    var heatData = [];
-    var snow;
-    function ready(error, data){
-        snow = data;
+            snow.forEach(function (d) {
+                L.circle([d.lat, d.lng], 20, {
+                    color: 'blue',
+                    fillColor: 'steelBlue',
+                    fillOpacity: 0.2
+                }).addTo(map)
+            })
 
-        snow.forEach(function (d,i) {
-            d.LatLng = new L.LatLng(+d.lat, +d.lng);
-            coords.push([d.LatLng.lat, d.LatLng.lng])
-            heatData.push([d.LatLng.lat, d.LatLng.lng, d.val])
-        });
-
-        var mapCenter = getLatLngCenter(coords);
-        console.log(mapCenter)
-        //Leaflet Stuff
-        map = L.map("sourceMap");
-        //Set the zoom based on the coordinates
-        map.setView(mapCenter,map.fitBounds(coords)._zoom);
-        L.tileLayer('https://{s}.tiles.mapbox.com/v3/{id}/{z}/{x}/{y}.png', {
-            maxZoom: 18,
-            minZoom: 2,
-            id: 'mdowd.n6anai1b',
-            access_token: "pk.eyJ1IjoibWRvd2QiLCJhIjoic0xVV3F6cyJ9.-gW3HHcgm-6qeMajHWz5_A"
-        }).addTo(map);
-        L.control.scale().addTo(map);
+            var heat = L.heatLayer(heatData, {
+                radius: 20,
+                blur: 15,
+                maxZoom: 15,
+            }).addTo(map);
 
 
-        snow.forEach(function(d){
-            L.circle([d.lat, d.lng], 20,{
-                color: 'blue',
-                fillColor: 'steelBlue',
-                fillOpacity: 0.2
-            }).addTo(map)
-        })
-
-        var heat = L.heatLayer(heatData, {
-            radius: 20,
-            blur: 15,
-            maxZoom: 15,
-        }).addTo(map);
-
-
+        }
+    }
+    //Pad with zeros
+    function pad(num, size) {
+        var s = "000000000" + num;
+        return s.substr(s.length-size);
     }
 
+    make(initialData)
 
+    fileList = [];
+
+        for (i=2006; i<2015; i++){
+            for (j=1; j<13; j++){
+                fileList.push("c_" + pad(j,2)+ "_"+i)
+
+            }
+        }
+
+    increment = 0;
+    function run(increment){
+        make("cleaned/" + fileList[0] + ".csv")
+    }
+   var Interval = setInterval(run, 3000)
 </script>
 </body>
 </html>

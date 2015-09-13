@@ -21,7 +21,7 @@ for index, line in enumerate(lines):
                 myOut.remove('')
         
             lineString = ",".join(myOut)
-            out_file.write(lineString + ","+ str(1000*random.random()) + "\n")
+            out_file.write(lineString + ","+ str(100*random.random()) + "\n")
     except IndexError:
         print "no"
 

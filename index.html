@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <script src="libs/d3/d3.min.js" charset="utf-8"></script>
+    <script src="libs/jquery/jquery-2.1.1.min.js" charset="utf-8"></script>
+    <script src="libs/bootstrap/js/bootstrap.min.js" charset="utf-8"></script>
+    <script src="libs/queue/queue.min.js"></script>
+    <script src="libs/leaflet-0.7.3/leaflet.js"></script>
+    <script src="libs/leaflet-heat.js"></script>
+    <script src="libs/Leaflet.EasyButton-master/easy-button.js"></script>
+
+    <!--Viz Scripts-->
+    <link rel="stylesheet" type="text/css" href="libs/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="libs/leaflet-0.7.3/leaflet.css"/>
+    <link rel="stylesheet" type="text/css" href="css/main_style.css">
+    <link rel="stylesheet" type="text/css" href="libs/Leaflet.EasyButton-master/easy-button.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+    <title></title>
+</head>
+<body>
+<div id = 'context'>Inital pass at visualizing snow data from <a href="https://www.ncdc.noaa.gov/snow-and-ice/daily-snow/">NOAA</a>. </div>
+<div id="sourceMap"></div>
+<div>
+    <strong>Next Steps</strong>
+    <ul>
+        <li>Convert to daily values</li>
+        <li>Add slider for moving through values</li>
+        <li>Add second frame to allow comparison across years/months</li>
+        <li>Add some summary chart statistics</li>
+    </ul>
+
+</div>
+<script>
+
+    map = L.map("sourceMap", {zoomControl:false});
+    var first = 0;
+    var increment = 0;
+    var heat;
+    var heatData;
+    var info = L.control({position: 'bottomleft'});
+    var incrementForward = true;
+    var Lpoints;
+    function make(dataPath) {
+        heatData = [];
+        //Load the Data
+        queue()
+                .defer(d3.csv,dataPath)
+                .await(ready);
+        //Variables
+
+
+        var snow;
+
+        function ready(error, data) {
+            snow = data;
+
+            snow.forEach(function (d, i) {
+                d.LatLng = new L.LatLng(+d.lat, +d.lng);
+                heatData.push([d.LatLng.lat, d.LatLng.lng, d.TotalSnow * d.TotalSnow])
+            });
+
+            //Leaflet Stuff
+            if (!first){
+                L.easyButton('fa-pause', pause).addTo(map);
+                L.easyButton('fa-caret-right fa-2x', start).addTo(map);
+                L.easyButton('fa-caret-left fa-2x', back).addTo(map);
+                //Set the zoom based on the coordinates
+                map.setView(["40.678620", "-102.797535"], 4);
+                L.tileLayer('https://{s}.tiles.mapbox.com/v3/{id}/{z}/{x}/{y}.png', {
+                    maxZoom: 18,
+                    id: 'mdowd.n6anai1b',
+                    access_token: "pk.eyJ1IjoibWRvd2QiLCJhIjoic0xVV3F6cyJ9.-gW3HHcgm-6qeMajHWz5_A"
+                }).addTo(map);
+                map.dragging.disable();
+                map.touchZoom.disable();
+                map.doubleClickZoom.disable();
+                map.scrollWheelZoom.disable();
+
+                Lpoints = new L.layerGroup()
+                snow.forEach(function (d) {
+                    Lpoints.addLayer(L.circle([d.lat, d.lng], 20, {
+                        color: 'blue',
+                        fillColor: 'steelBlue',
+                        fillOpacity: 0.2
+                    })
+                    )
+                });
+
+
+
+                map.addLayer(Lpoints)
+
+                    heat = L.heatLayer(heatData, {
+                        radius: 20,
+                        blur: 15,
+                        maxZoom: 15,
+                    }).addTo(map);
+
+                    first=1;
+
+            }
+
+            if (first){
+                Lpoints.clearLayers()
+                snow.forEach(function (d) {
+                    Lpoints.addLayer(L.circle([d.lat, d.lng], 20, {
+                                color: 'blue',
+                                fillColor: 'steelBlue',
+                                fillOpacity: 0.2
+                            })
+                    )
+                });
+
+                heat.setLatLngs([])
+                heat = L.heatLayer(heatData, {
+                    radius: 20,
+                    blur: 15,
+                    maxZoom: 15,
+                }).addTo(map);
+            }
+
+
+            updateDisplay(dataPath);
+
+        }
+    }
+    //Pad with zeros
+    function pad(num, size) {
+        var s = "000000000" + num;
+        return s.substr(s.length-size);
+    }
+
+
+
+    fileList = [];
+
+        for (i=2006; i<2015; i++){
+            for (j=1; j<13; j++){
+                fileList.push("c_" + pad(j,2)+ "_"+i)
+
+            }
+        }
+
+    make("cleaned/" + fileList[0] + ".csv");
+
+    function run(){
+        increment = incrementForward ? increment + 1 : increment - 1;
+        console.log("cleaned/" + fileList[increment] + ".csv")
+        $(".info")
+        make("cleaned/" + fileList[increment] + ".csv")
+    }
+
+
+    function updateDisplay(path){
+
+        console.log(path)
+        $('.info').remove();
+        var legendText = path.split("/")[1].split('_');
+        legendText = [legendText[2].split(".")[0], legendText[1]]
+
+        info.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'info');
+
+            this.update()
+            return this._div;
+        };
+
+        //Control FLow for Labels - sort of a mess but running out of time.
+
+        info.update = function (asset) {
+            this._div.innerHTML = '<h4>' + legendText[0] + "-" + legendText[1] + '</h4>'
+        };
+        info.addTo(map);
+
+    }
+
+    var Interval;
+    function start(){
+        incrementForward = true;
+        Interval = setInterval(run, 1000)
+    }
+    start()
+    function pause(){
+        clearInterval(Interval)
+    }
+
+    function back(){
+        incrementForward = false;
+        Interval = setInterval(run, 1000)
+    }
+
+</script>
+</body>
+</html>
